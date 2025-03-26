@@ -1,0 +1,133 @@
+#!/usr/bin/env bash
+
+set -e
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# Version information
+VERSION="0.1.0"
+REPO="soundnesslabs/soundness-layer"
+CLI_BINARY="soundness-cli"
+
+# Installation directories
+BASE_DIR=$HOME
+SOUNDNESS_DIR=${SOUNDNESS_DIR-"$BASE_DIR/.soundness"}
+SOUNDNESS_BIN_DIR="$SOUNDNESS_DIR/bin"
+CLI_BINARY_PATH="$SOUNDNESS_BIN_DIR/$CLI_BINARY"
+
+# Function to print colored messages
+print_message() {
+    echo -e "${2}${1}${NC}"
+}
+
+# Function to check if a command exists
+command_exists() {
+    command -v "$1" >/dev/null 2>&1
+}
+
+# Function to check if cargo is installed
+check_cargo() {
+    if ! command_exists cargo; then
+        print_message "❌ Cargo is not installed. Please install Rust and Cargo first." "$RED"
+        print_message "Visit https://rustup.rs/ for installation instructions." "$YELLOW"
+        exit 1
+    fi
+}
+
+# Function to install the CLI
+install_cli() {
+    print_message "🚀 Installing $CLI_BINARY..." "$GREEN"
+    
+    # Create temporary directory for building
+    TEMP_DIR=$(mktemp -d)
+    trap 'rm -rf "$TEMP_DIR"' EXIT
+    
+    # Clone the repository
+    git clone --depth 1 https://github.com/$REPO.git "$TEMP_DIR"
+    
+    # Build the CLI
+    cd "$TEMP_DIR/soundness-cli"
+    cargo build --release
+    
+    # Copy the binary to the bin directory
+    mkdir -p "$SOUNDNESS_BIN_DIR"
+    cp target/release/$CLI_BINARY "$CLI_BINARY_PATH"
+    
+    print_message "✅ Installation complete!" "$GREEN"
+}
+
+# Function to update the CLI
+update_cli() {
+    print_message "🔄 Checking for updates..." "$YELLOW"
+    
+    # Create temporary directory for building
+    TEMP_DIR=$(mktemp -d)
+    trap 'rm -rf "$TEMP_DIR"' EXIT
+    
+    # Clone the repository
+    git clone --depth 1 https://github.com/$REPO.git "$TEMP_DIR"
+    
+    # Get the latest version
+    LATEST_VERSION=$(cd "$TEMP_DIR" && git describe --tags --abbrev=0 2>/dev/null || echo "v$VERSION")
+    
+    if [ "$LATEST_VERSION" = "v$VERSION" ]; then
+        print_message "✅ You're already using the latest version ($VERSION)" "$GREEN"
+        return
+    fi
+    
+    print_message "📦 Updating to $LATEST_VERSION..." "$YELLOW"
+    
+    # Build the CLI
+    cd "$TEMP_DIR/soundness-cli"
+    cargo build --release
+    
+    # Copy the binary to the bin directory
+    mkdir -p "$SOUNDNESS_BIN_DIR"
+    cp target/release/$CLI_BINARY "$CLI_BINARY_PATH"
+    
+    print_message "✅ Update complete!" "$GREEN"
+}
+
+# Function to show help
+show_help() {
+    echo "soundnessup v$VERSION"
+    echo
+    echo "Usage:"
+    echo "  soundnessup install    Install the Soundness CLI"
+    echo "  soundnessup update     Update the Soundness CLI to the latest version"
+    echo "  soundnessup version    Show the current version"
+    echo "  soundnessup help       Show this help message"
+    echo
+    echo "For more information, visit: https://github.com/$REPO"
+}
+
+# Main script
+case "$1" in
+    install)
+        check_cargo
+        install_cli
+        ;;
+    update)
+        check_cargo
+        update_cli
+        ;;
+    version)
+        print_message "soundnessup v$VERSION" "$GREEN"
+        ;;
+    help|--help|-h)
+        show_help
+        ;;
+    *)
+        if [ -z "$1" ]; then
+            show_help
+        else
+            print_message "❌ Unknown command: $1" "$RED"
+            show_help
+            exit 1
+        fi
+        ;;
+esac 
